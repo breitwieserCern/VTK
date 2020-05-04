@@ -249,6 +249,56 @@ void vtkLinearTransform::TransformPoints(vtkPoints* inPts, vtkPoints* outPts)
 }
 
 //----------------------------------------------------------------------------
+// TODO avoid code duplication
+void vtkLinearTransform::TransformPoints(vtkPoints* inPts, vtkPoints* outPts, vtkIdType offset)
+{
+  vtkIdType n = inPts->GetNumberOfPoints();
+  double(*matrix)[4] = this->Matrix->Element;
+
+  this->Update();
+
+  // operate directly on the memory to avoid GetPoint()/SetPoint() calls.
+  vtkDataArray* inArray = inPts->GetData();
+  vtkDataArray* outArray = outPts->GetData();
+  int inType = inArray->GetDataType();
+  int outType = outArray->GetDataType();
+  void* inPtr = inArray->GetVoidPointer(0);
+  // TODO
+  // void* outPtr = outArray->WriteVoidPointer(3 * m, 3 * n);
+  void* outPtr = outArray->GetVoidPointer(3 * offset);
+
+  if (inType == VTK_FLOAT && outType == VTK_FLOAT)
+  {
+    vtkLinearTransformPoints(matrix, static_cast<float*>(inPtr), static_cast<float*>(outPtr), n);
+  }
+  else if (inType == VTK_FLOAT && outType == VTK_DOUBLE)
+  {
+    vtkLinearTransformPoints(matrix, static_cast<float*>(inPtr), static_cast<double*>(outPtr), n);
+  }
+  else if (inType == VTK_DOUBLE && outType == VTK_FLOAT)
+  {
+    vtkLinearTransformPoints(matrix, static_cast<double*>(inPtr), static_cast<float*>(outPtr), n);
+  }
+  else if (inType == VTK_DOUBLE && outType == VTK_DOUBLE)
+  {
+    vtkLinearTransformPoints(matrix, static_cast<double*>(inPtr), static_cast<double*>(outPtr), n);
+  }
+  else
+  {
+    double point[3];
+
+    for (vtkIdType i = 0; i < n; i++)
+    {
+      inPts->GetPoint(i, point);
+
+      vtkLinearTransformPoint(matrix, point, point);
+
+      outPts->SetPoint(offset + i, point);
+    }
+  }
+}
+
+//----------------------------------------------------------------------------
 void vtkLinearTransform::TransformNormals(vtkDataArray* inNms, vtkDataArray* outNms)
 {
   vtkIdType n = inNms->GetNumberOfTuples();
@@ -297,6 +347,60 @@ void vtkLinearTransform::TransformNormals(vtkDataArray* inNms, vtkDataArray* out
       vtkMath::Normalize(norm);
 
       outNms->SetTuple(m + i, norm);
+    }
+  }
+}
+
+//----------------------------------------------------------------------------
+// TODO avoid code duplication
+void vtkLinearTransform::TransformNormals(vtkDataArray* inNms, vtkDataArray* outNms, vtkIdType offset) {
+  vtkIdType n = inNms->GetNumberOfTuples();
+  double matrix[4][4];
+
+  this->Update();
+
+  // to transform the normal, multiply by the transposed inverse matrix
+  vtkMatrix4x4::DeepCopy(*matrix, this->Matrix);
+  vtkMatrix4x4::Invert(*matrix, *matrix);
+  vtkMatrix4x4::Transpose(*matrix, *matrix);
+
+  // operate directly on the memory to avoid GetTuple()/SetPoint() calls.
+  int inType = inNms->GetDataType();
+  int outType = outNms->GetDataType();
+  void* inPtr = inNms->GetVoidPointer(0);
+  // TODO
+  // void* outPtr = outNms->WriteVoidPointer(3 * m, 3 * n);
+  void* outPtr = outNms->GetVoidPointer(3 * offset);
+
+  if (inType == VTK_FLOAT && outType == VTK_FLOAT)
+  {
+    vtkLinearTransformNormals(matrix, static_cast<float*>(inPtr), static_cast<float*>(outPtr), n);
+  }
+  else if (inType == VTK_FLOAT && outType == VTK_DOUBLE)
+  {
+    vtkLinearTransformNormals(matrix, static_cast<float*>(inPtr), static_cast<double*>(outPtr), n);
+  }
+  else if (inType == VTK_DOUBLE && outType == VTK_FLOAT)
+  {
+    vtkLinearTransformNormals(matrix, static_cast<double*>(inPtr), static_cast<float*>(outPtr), n);
+  }
+  else if (inType == VTK_DOUBLE && outType == VTK_DOUBLE)
+  {
+    vtkLinearTransformNormals(matrix, static_cast<double*>(inPtr), static_cast<double*>(outPtr), n);
+  }
+  else
+  {
+    for (vtkIdType i = 0; i < n; i++)
+    {
+      double norm[3];
+
+      inNms->GetTuple(i, norm);
+
+      // use TransformVector because matrix is already transposed & inverted
+      vtkLinearTransformVector(matrix, norm, norm);
+      vtkMath::Normalize(norm);
+
+      outNms->SetTuple(offset + i, norm);
     }
   }
 }

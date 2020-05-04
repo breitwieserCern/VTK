@@ -182,11 +182,17 @@ public:
    */
   void TransformPoints(vtkPoints* inPts, vtkPoints* outPts) override;
 
+  //TODO
+  virtual void TransformPoints(vtkPoints* inPts, vtkPoints* outPts, vtkIdType offset);
+
   /**
    * Apply the transformation to a series of normals, and append the
    * results to outNms.
    */
   virtual void TransformNormals(vtkDataArray* inNms, vtkDataArray* outNms);
+  
+  //TODO
+  virtual void TransformNormals(vtkDataArray* inNms, vtkDataArray* outNms, vtkIdType offset);
 
   /**
    * Apply the transformation to a series of vectors, and append the

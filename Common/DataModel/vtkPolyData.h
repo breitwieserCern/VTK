@@ -306,6 +306,9 @@ public:
       inPolyData, static_cast<double>(numCells) / inPolyData->GetNumberOfCells());
   }
 
+  // TODO add documentation
+  void Resize(vtkIdType numCells);
+
   /**
    * Insert a cell of type VTK_VERTEX, VTK_POLY_VERTEX, VTK_LINE, VTK_POLY_LINE,
    * VTK_TRIANGLE, VTK_QUAD, VTK_POLYGON, or VTK_TRIANGLE_STRIP.  Make sure that
@@ -324,6 +327,9 @@ public:
    */
   vtkIdType InsertNextCell(int type, vtkIdList* pts);
 
+  // TODO 
+  void SetCellAt(vtkIdType cellId, int type, vtkIdList* pts);
+  
   /**
    * Begin inserting data all over again. Memory is not freed but otherwise
    * objects are returned to their initial state.

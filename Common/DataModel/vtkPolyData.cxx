@@ -824,6 +824,23 @@ bool vtkPolyData::AllocateCopy(vtkPolyData* pd)
 }
 
 //----------------------------------------------------------------------------
+void vtkPolyData::Resize(vtkIdType numCells) {
+  // std::cout << "vtkPolyData::Resize " << this->Cells << " " << this->Polys << std::endl;
+  if (!this->Cells) 
+  {
+    this->Cells = vtkSmartPointer<CellMap>::New();
+  }
+  if (!this->Polys) 
+  {
+    this->Polys = vtkSmartPointer<vtkCellArray>::New();
+  }
+
+
+  this->Cells->SetSize(numCells);
+  this->Polys->ResizeExact(numCells, 3 * numCells);
+}
+
+//----------------------------------------------------------------------------
 bool vtkPolyData::AllocateProportional(vtkPolyData* pd, double ratio)
 {
 
@@ -1102,6 +1119,34 @@ vtkIdType vtkPolyData::InsertNextCell(int type, int npts, const vtkIdType ptsIn[
 vtkIdType vtkPolyData::InsertNextCell(int type, vtkIdList* pts)
 {
   return this->InsertNextCell(type, static_cast<int>(pts->GetNumberOfIds()), pts->GetPointer(0));
+}
+
+//----------------------------------------------------------------------------
+void vtkPolyData::SetCellAt(vtkIdType cellId, int type, vtkIdList* ptsIn)
+{
+  int npts = static_cast<int>(ptsIn->GetNumberOfIds());
+  const auto* pts = ptsIn->GetPointer(0);
+
+  // TODO parameter checks
+  // TODO VTK_PIXEL
+  
+  TaggedCellId& tag = this->Cells->SetCellAt(cellId, VTKCellType(type));
+  vtkCellArray* cells = this->GetCellArrayInternal(tag);
+
+  // Validate and update the internal cell id:
+  // std::cout << cells << " " << this->Polys << std::endl;
+  cells->SetCellAt(cellId, npts, pts);
+  // if (internalCellId < 0)
+  // {
+  //   vtkErrorMacro("Internal error: Invalid cell id (" << internalCellId << ").");
+  //   return -1;
+  // }
+  // if (!CellMap::ValidateCellId(internalCellId))
+  // {
+  //   vtkErrorMacro("Internal cell array storage exceeded.");
+  //   return -1;
+  // }
+  tag.SetCellId(cellId);
 }
 
 //----------------------------------------------------------------------------

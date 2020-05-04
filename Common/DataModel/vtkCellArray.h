@@ -624,6 +624,9 @@ public:
    */
   vtkIdType InsertNextCell(int npts);
 
+  // TODO 
+  void SetCellAt(vtkIdType cellId, vtkIdType npts, const vtkIdType* pts);
+
   /**
    * Used in conjunction with InsertNextCell(npts) to add another point
    * to the list of cells.
@@ -1365,6 +1368,32 @@ struct InsertNextCellImpl
   }
 };
 
+struct SetCellAtImpl 
+{
+  // Insert full cell
+  template <typename CellStateT>
+  void operator()(CellStateT& state, const vtkIdType cellId, const vtkIdType npts, const vtkIdType pts[])
+  {
+    using ValueType = typename CellStateT::ValueType;
+    auto* conn = state.GetConnectivity();
+    auto* offsets = state.GetOffsets();
+
+    // TODO 
+    auto offset = cellId * npts;
+
+    // std::cout << "SCAI p    " << cellId << " " << npts << std::endl;
+    // std::cout << "SCAI conn " << conn->GetNumberOfValues() << std::endl;
+    // std::cout << "SCAI offs " << offsets->GetNumberOfValues() << std::endl;
+    // std::cout << "SCAI o    " << offset << std::endl;
+    offsets->InsertValue(cellId + 1, offset + npts);
+
+    for (vtkIdType i = 0; i < npts; ++i)
+    {
+      conn->InsertValue(offset + i, static_cast<ValueType>(pts[i]));
+    }
+  }
+};
+
 // for incremental API:
 struct UpdateCellCountImpl
 {
@@ -1570,6 +1599,12 @@ inline vtkIdType vtkCellArray::InsertNextCell(vtkCell* cell)
   vtkIdList* pts = cell->GetPointIds();
   return this->Visit(
     vtkCellArray_detail::InsertNextCellImpl{}, pts->GetNumberOfIds(), pts->GetPointer(0));
+}
+
+//----------------------------------------------------------------------------
+inline void vtkCellArray::SetCellAt(vtkIdType cellId, vtkIdType npts, const vtkIdType* pts)
+{
+  this->Visit(vtkCellArray_detail::SetCellAtImpl{}, cellId, npts, pts);
 }
 
 //----------------------------------------------------------------------------

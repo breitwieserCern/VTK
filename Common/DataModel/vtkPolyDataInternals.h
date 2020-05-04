@@ -233,6 +233,8 @@ public:
 
   void SetCapacity(vtkIdType numCells) { this->Map.reserve(static_cast<std::size_t>(numCells)); }
 
+  void SetSize(vtkIdType numCells) { this->Map.resize(static_cast<std::size_t>(numCells)); }
+
   TaggedCellId& GetTag(vtkIdType cellId) { return this->Map[static_cast<std::size_t>(cellId)]; }
 
   const TaggedCellId& GetTag(vtkIdType cellId) const
@@ -253,6 +255,12 @@ public:
   {
     this->Map.emplace_back(vtkIdType(0), cellType);
     return this->Map.back();
+  }
+
+  TaggedCellId& SetCellAt(vtkIdType cellId, VTKCellType cellType)
+  {
+    this->Map[cellId] = TaggedCellId(vtkIdType(0), cellType);
+    return this->Map[cellId];
   }
 
   vtkIdType GetNumberOfCells() const { return static_cast<vtkIdType>(this->Map.size()); }

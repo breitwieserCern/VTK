@@ -475,6 +475,9 @@ public:
   void CopyAllocate(vtkDataSetAttributes* pd, vtkIdType sze, vtkIdType ext, int shallowCopyArrays);
   //@}
 
+  // TODO
+  void CopyResize(vtkDataSetAttributes* pd, vtkIdType sze); 
+
   /**
    * Create a mapping between the input attributes and this object
    * so that methods like CopyData() and CopyStructuredData()
@@ -509,6 +512,9 @@ public:
   void CopyData(vtkDataSetAttributes* fromPd, vtkIdType fromId, vtkIdType toId);
   void CopyData(vtkDataSetAttributes* fromPd, vtkIdList* fromIds, vtkIdList* toIds);
   //@}
+
+  // TODO
+  void CopyData1(vtkDataSetAttributes* fromPd, vtkIdList* fromIds, vtkIdList* toIds);
 
   /**
    * Copy n consecutive attributes starting at srcStart from fromPd to this

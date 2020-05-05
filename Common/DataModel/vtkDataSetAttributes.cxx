@@ -840,6 +840,21 @@ void vtkDataSetAttributes::CopyData(
 }
 
 //--------------------------------------------------------------------------
+void vtkDataSetAttributes::CopyData1(vtkDataSetAttributes* fromPd, vtkIdList* fromIds, vtkIdList* toIds) 
+{
+  int i;
+  for (i = this->RequiredArrays.BeginIndex(); !this->RequiredArrays.End();
+       i = this->RequiredArrays.NextIndex())
+  {
+    for(vtkIdType i = 0; i < fromIds->GetNumberOfIds(); ++i) {
+      auto from = fromIds->GetId(i);
+      auto to = toIds->GetId(i);
+      this->Data[this->TargetIndices[i]]->SetTuple(to, from, fromPd->Data[i]);
+    } 
+  }
+}
+
+//--------------------------------------------------------------------------
 void vtkDataSetAttributes::CopyData(
   vtkDataSetAttributes* fromPd, vtkIdType dstStart, vtkIdType n, vtkIdType srcStart)
 {
@@ -862,6 +877,115 @@ void vtkDataSetAttributes::InterpolateAllocate(
   vtkDataSetAttributes* pd, vtkIdType sze, vtkIdType ext, int shallowCopyArrays)
 {
   this->InternalCopyAllocate(pd, INTERPOLATE, sze, ext, shallowCopyArrays);
+}
+
+//--------------------------------------------------------------------------
+void vtkDataSetAttributes::CopyResize(vtkDataSetAttributes* pd, vtkIdType sze)
+{
+  // TODO
+  int shallowCopyArrays = 0;
+  auto ctype = COPYTUPLE;
+  vtkAbstractArray* newAA;
+  int i;
+
+  // Create various point data depending upon input
+  //
+  if (!pd)
+  {
+    return;
+  }
+
+  this->RequiredArrays = this->ComputeRequiredArrays(pd, COPYTUPLE);
+  if (this->RequiredArrays.GetListSize() == 0)
+  {
+    return;
+  }
+  delete[] this->TargetIndices;
+  this->TargetIndices = new int[pd->GetNumberOfArrays()];
+  for (i = 0; i < pd->GetNumberOfArrays(); i++)
+  {
+    this->TargetIndices[i] = -1;
+  }
+
+  vtkAbstractArray* aa = nullptr;
+  // If we are not copying on self
+  if ((pd != this))
+  {
+    int attributeType;
+
+    for (i = this->RequiredArrays.BeginIndex(); !this->RequiredArrays.End();
+         i = this->RequiredArrays.NextIndex())
+    {
+      // Create all required arrays
+      aa = pd->GetAbstractArray(i);
+      if (shallowCopyArrays)
+      {
+        newAA = aa;
+      }
+      else
+      {
+        newAA = aa->NewInstance();
+        newAA->SetNumberOfComponents(aa->GetNumberOfComponents());
+        newAA->CopyComponentNames(aa);
+        newAA->SetName(aa->GetName());
+        if (aa->HasInformation())
+        {
+          newAA->CopyInformation(aa->GetInformation(), /*deep=*/1);
+        }
+        if (sze > 0)
+        {
+          newAA->SetNumberOfValues(sze);
+        }
+        else
+        {
+          newAA->SetNumberOfTuples(aa->GetNumberOfTuples());
+        }
+        vtkDataArray* newDA = vtkArrayDownCast<vtkDataArray>(newAA);
+        if (newDA)
+        {
+          vtkDataArray* da = vtkArrayDownCast<vtkDataArray>(aa);
+          newDA->SetLookupTable(da->GetLookupTable());
+        }
+      }
+      this->TargetIndices[i] = this->AddArray(newAA);
+      // If necessary, make the array an attribute
+      if (((attributeType = pd->IsArrayAnAttribute(i)) != -1) &&
+        this->CopyAttributeFlags[ctype][attributeType])
+      {
+        this->CopyAttributeFlags[ctype][attributeType] =
+          pd->CopyAttributeFlags[ctype][attributeType];
+        this->SetActiveAttribute(this->TargetIndices[i], attributeType);
+      }
+      if (!shallowCopyArrays)
+      {
+        newAA->Delete();
+      }
+    }
+  }
+  else if (pd == this)
+  {
+    // If copying on self, resize the arrays and initialize
+    // TargetIndices
+    for (i = this->RequiredArrays.BeginIndex(); !this->RequiredArrays.End();
+         i = this->RequiredArrays.NextIndex())
+    {
+      aa = pd->GetAbstractArray(i);
+      aa->Resize(sze);
+      this->TargetIndices[i] = i;
+    }
+  }
+  else
+  {
+    // All we are asked to do is create a mapping.
+    // Here we assume that arrays are the same and ordered
+    // the same way.
+    for (i = this->RequiredArrays.BeginIndex(); !this->RequiredArrays.End();
+         i = this->RequiredArrays.NextIndex())
+    {
+      this->TargetIndices[i] = i;
+    }
+  }
+  
 }
 
 //--------------------------------------------------------------------------

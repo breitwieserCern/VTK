@@ -183,6 +183,9 @@ public:
   void TransformPoints(vtkPoints* inPts, vtkPoints* outPts) override;
 
   //TODO
+  virtual void TransformPointsWoUpdate(vtkPoints* inPts, vtkPoints* outPts);
+  
+  //TODO
   virtual void TransformPoints(vtkPoints* inPts, vtkPoints* outPts, vtkIdType offset);
 
   /**

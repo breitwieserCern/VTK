@@ -1385,11 +1385,11 @@ struct SetCellAtImpl
     // std::cout << "SCAI conn " << conn->GetNumberOfValues() << std::endl;
     // std::cout << "SCAI offs " << offsets->GetNumberOfValues() << std::endl;
     // std::cout << "SCAI o    " << offset << std::endl;
-    offsets->InsertValue(cellId + 1, offset + npts);
+    offsets->SetValue(cellId + 1, offset + npts);
 
     for (vtkIdType i = 0; i < npts; ++i)
     {
-      conn->InsertValue(offset + i, static_cast<ValueType>(pts[i]));
+      conn->SetValue(offset + i, static_cast<ValueType>(pts[i]));
     }
   }
 };

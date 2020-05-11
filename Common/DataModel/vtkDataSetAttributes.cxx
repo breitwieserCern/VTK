@@ -846,9 +846,9 @@ void vtkDataSetAttributes::CopyData1(vtkDataSetAttributes* fromPd, vtkIdList* fr
   for (i = this->RequiredArrays.BeginIndex(); !this->RequiredArrays.End();
        i = this->RequiredArrays.NextIndex())
   {
-    for(vtkIdType i = 0; i < fromIds->GetNumberOfIds(); ++i) {
-      auto from = fromIds->GetId(i);
-      auto to = toIds->GetId(i);
+    for(vtkIdType j = 0; j < fromIds->GetNumberOfIds(); ++j) {
+      auto from = fromIds->GetId(j);
+      auto to = toIds->GetId(j);
       this->Data[this->TargetIndices[i]]->SetTuple(to, from, fromPd->Data[i]);
     } 
   }

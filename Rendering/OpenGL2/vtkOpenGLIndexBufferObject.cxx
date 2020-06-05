@@ -54,13 +54,17 @@ struct AppendTrianglesWorker
   {
     ValueType* points = src->Begin();
 
-    auto cellIter = vtk::TakeSmartPointer(cells->NewIterator());
+    auto numCells = cells->GetNumberOfCells();
+    //TODO does this apply for all use cases? cellSize constant 3?!?
+    indexArray->resize(3 * numCells);
 
-    for (cellIter->GoToFirstCell(); !cellIter->IsDoneWithTraversal(); cellIter->GoToNextCell())
+#pragma omp parallel for
+    for (vtkIdType j = 0; j < numCells; ++j)
     {
       vtkIdType cellSize;
       const vtkIdType* cell;
-      cellIter->GetCurrentCell(cellSize, cell);
+      // cellIter->GetCurrentCell(cellSize, cell);
+      cells->GetCellAtId(j, cellSize, cell);
 
       if (cellSize >= 3)
       {
@@ -76,9 +80,9 @@ struct AppendTrianglesWorker
             (p3[0] != p2[0] || p3[1] != p2[1] || p3[2] != p2[2]) &&
             (p3[0] != p1[0] || p3[1] != p1[1] || p3[2] != p1[2]))
           {
-            indexArray->push_back(static_cast<unsigned int>(id1 + vOffset));
-            indexArray->push_back(static_cast<unsigned int>(id2 + vOffset));
-            indexArray->push_back(static_cast<unsigned int>(id3 + vOffset));
+            (*indexArray)[3 * j] = static_cast<unsigned int>(id1 + vOffset);
+            (*indexArray)[3 * j + 1] = static_cast<unsigned int>(id2 + vOffset);
+            (*indexArray)[3 * j + 2] = static_cast<unsigned int>(id3 + vOffset);
           }
         }
       }

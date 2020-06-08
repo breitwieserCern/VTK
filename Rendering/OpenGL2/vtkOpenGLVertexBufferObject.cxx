@@ -220,11 +220,14 @@ void vtkAppendVBOWorker<destType>::operator()(vtkAOSDataArrayTemplate<ValueType>
   }
   else
   {
+#pragma omp parallel for 
     for (unsigned int i = 0; i < numTuples; ++i)
     {
       for (unsigned int j = 0; j < numComps; j++)
       {
-        *(VBOit++) = (*(input++) - this->Shift.at(j)) * this->Scale.at(j);
+        // *(VBOit++) = (*(input++) - this->Shift.at(j)) * this->Scale.at(j);
+        auto offset = i * numComps + i * extraComponents + j;
+        *(VBOit+ offset) = (*(input+offset) - this->Shift.at(j)) * this->Scale.at(j);
       }
       VBOit += extraComponents;
     }
@@ -486,7 +489,7 @@ void vtkOpenGLVertexBufferObject::AppendDataArray(vtkDataArray* array)
   this->NumberOfTuples += array->GetNumberOfTuples();
 
   // Resize VBO to fit new array
-  this->PackedVBO.resize(this->NumberOfTuples * this->Stride / sizeof(float));
+  this->PackedVBO.reserve(this->NumberOfTuples * this->Stride / sizeof(float));
 
   // Dispatch based on the array data type
   typedef vtkArrayDispatch::DispatchByValueType<vtkArrayDispatch::AllTypes> Dispatcher;

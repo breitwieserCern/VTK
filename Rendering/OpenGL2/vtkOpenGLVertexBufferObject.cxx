@@ -380,7 +380,7 @@ void vtkOpenGLVertexBufferObject::UploadDataArray(vtkDataArray* array)
     this->NumberOfTuples = array->GetNumberOfTuples();
 
     // Resize VBO to fit new array
-    this->PackedVBO.resize(this->NumberOfTuples * this->Stride / sizeof(float));
+    this->PackedVBO.reserve(this->NumberOfTuples * this->Stride / sizeof(float));
 
     // Dispatch based on the array data type
     typedef vtkArrayDispatch::DispatchByValueType<vtkArrayDispatch::AllTypes> Dispatcher;
@@ -415,7 +415,12 @@ void vtkOpenGLVertexBufferObject::UploadDataArray(vtkDataArray* array)
     }
 
     this->Modified();
-    this->UploadVBO();
+    // this->UploadVBO();
+    // this->Upload(this->PackedVBO, vtkOpenGLBufferObject::ArrayBuffer);
+    // FIXME copied implementation of UploadVBO and mofified it to use capacity instead of size
+    this->UploadInternal(&this->PackedVBO[0], this->PackedVBO.capacity() * sizeof(float), vtkOpenGLBufferObject::ArrayBuffer);
+    this->PackedVBO.resize(0);
+    this->UploadTime.Modified();
   }
 }
 

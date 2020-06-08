@@ -48,6 +48,7 @@ struct vtkOpenGLBufferObject::Private
   }
   GLenum Type;
   GLuint Handle;
+  void* Buffer = nullptr;
 };
 
 vtkOpenGLBufferObject::vtkOpenGLBufferObject()
@@ -68,6 +69,7 @@ vtkOpenGLBufferObject::~vtkOpenGLBufferObject()
 
 void vtkOpenGLBufferObject::ReleaseGraphicsResources()
 {
+  std::cout << "ReleaseGraphicsResources" << std::endl;
   if (this->Internal->Handle != 0)
   {
     glBindBuffer(this->Internal->Type, 0);
@@ -187,6 +189,7 @@ bool vtkOpenGLBufferObject::UploadInternal(
   const void* buffer, size_t size, vtkOpenGLBufferObject::ObjectType objectType)
 {
 	auto start = Timestamp();
+  auto old_handle = this->Internal->Handle;
   const bool generated = this->GenerateBuffer(objectType);
   if (!generated)
   {
@@ -198,10 +201,15 @@ bool vtkOpenGLBufferObject::UploadInternal(
   glBindBuffer(this->Internal->Type, this->Internal->Handle);
   // glBufferData(this->Internal->Type, size, static_cast<const GLvoid*>(buffer), GL_STATIC_DRAW);
 
-  const auto* charptr = (const char*) buffer;
-  glBufferData(this->Internal->Type, size, 0, GL_STATIC_DRAW);
-  auto* p = glMapBufferRange(this->Internal->Type, 0,size, GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-  auto* ptr = static_cast<char*>(p);
+  if (old_handle == 0) {
+    glBindBuffer(this->Internal->Type, this->Internal->Handle);
+    glBufferStorage(this->Internal->Type, size,  0, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+    this->Internal->Buffer = glMapBufferRange(this->Internal->Type, 0, size, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+  }
+  const auto* charptr = (const uint64_t*) buffer;
+  // glBufferData(this->Internal->Type, size, 0, GL_STATIC_DRAW);
+  // auto* p = glMapBufferRange(this->Internal->Type, 0,size, GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+  auto* ptr = static_cast<uint64_t*>(this->Internal->Buffer);
   if (!ptr) {
     std::cout << "ERROR in glMapBufferRange" << std::endl;
     GLenum err;
@@ -212,11 +220,19 @@ bool vtkOpenGLBufferObject::UploadInternal(
       std::cout << "gl buffer size " << gl_error_string(err) << std::endl;
     }
   }
-#pragma omp parallel for
-  for (int i = 0; i < size; ++i) {
-    ptr[i] = charptr[i];
-  }
-  glUnmapBuffer(this->Internal->Type);
+
+  // if (size > 349620) {
+#pragma omp parallel for 
+    for (int i = 0; i < size / sizeof(uint64_t); ++i) {
+      ptr[i] = charptr[i];
+    }
+  // } else {
+  //   for (int i = 0; i < size; ++i) {
+  //     ptr[i] = charptr[i];
+  //   }
+    
+  // }
+  // glUnmapBuffer(this->Internal->Type);
 
   auto duration = Timestamp() - start;
 	double rate = static_cast<double>(size) / (1024 * 1024 * 1024) / duration * 1000.0;

@@ -224,16 +224,23 @@ public:
     if (other)
     {
       this->Map = other->Map;
+      this->Size = other->Size;
+      for (vtkIdType i = 0; i < Size; ++i) {
+        this->Map[i] = other->Map[i];
+      }
     }
     else
     {
       this->Map.clear();
+      this->Size = 0;
     }
   }
 
   void SetCapacity(vtkIdType numCells) { this->Map.reserve(static_cast<std::size_t>(numCells)); }
 
-  void SetSize(vtkIdType numCells) { this->Map.resize(static_cast<std::size_t>(numCells)); }
+  void SetSize(vtkIdType numCells) { this->Map.reserve(static_cast<std::size_t>(numCells));
+    this->Size = numCells;
+  }
 
   TaggedCellId& GetTag(vtkIdType cellId) { return this->Map[static_cast<std::size_t>(cellId)]; }
 
@@ -246,6 +253,7 @@ public:
   void InsertNextCell(vtkIdType cellId, VTKCellType cellType)
   {
     this->Map.emplace_back(cellId, cellType);
+    this->Size++;
   }
 
   // Caller must ValidateCellType and ValidateCellId first.
@@ -254,6 +262,7 @@ public:
   TaggedCellId& InsertNextCell(VTKCellType cellType)
   {
     this->Map.emplace_back(vtkIdType(0), cellType);
+    this->Size++;
     return this->Map.back();
   }
 
@@ -263,9 +272,18 @@ public:
     return this->Map[cellId];
   }
 
-  vtkIdType GetNumberOfCells() const { return static_cast<vtkIdType>(this->Map.size()); }
+  void SetCellAt(vtkIdType pos, vtkIdType cellId, VTKCellType cellType)
+  {
+    this->Map[pos] = TaggedCellId(cellId, cellType);
+  }
+  
+  // vtkIdType GetNumberOfCells() const { return static_cast<vtkIdType>(this->Map.size()); }
+  vtkIdType GetNumberOfCells() const { return this->Size; }
 
-  void Reset() { this->Map.clear(); }
+  void Reset() { 
+    this->Map.clear(); 
+    this->Size = 0;
+  }
 
   void Squeeze()
   {
@@ -282,6 +300,7 @@ protected:
   CellMap();
   ~CellMap() override;
 
+  vtkIdType Size = 0;
   std::vector<TaggedCellId> Map;
 
 private:

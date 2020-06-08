@@ -872,6 +872,10 @@ namespace
 
 struct BuildCellsImpl
 {
+  vtkIdType offset;
+  BuildCellsImpl() : offset(0) {}
+  BuildCellsImpl(vtkIdType offset) : offset(offset) {}
+
   // Typer functor must take a vtkIdType cell size and convert it into a
   // VTKCellType. The functor must ensure that the input size and returned cell
   // type are valid for the target cell array or throw a std::runtime_error.
@@ -889,9 +893,11 @@ struct BuildCellsImpl
       throw std::runtime_error("Cell map storage capacity exceeded.");
     }
 
+#pragma omp parallel for
     for (vtkIdType cellId = 0; cellId < numCells; ++cellId)
     {
-      map->InsertNextCell(cellId, typer(state.GetCellSize(cellId)));
+      // map->InsertNextCell(cellId, typer(state.GetCellSize(cellId)));
+      map->SetCellAt(offset + cellId, cellId, typer(state.GetCellSize(cellId)));
     }
   }
 };
@@ -917,7 +923,7 @@ void vtkPolyData::BuildCells()
   const vtkIdType nCells = nVerts + nLines + nPolys + nStrips;
 
   this->Cells = vtkSmartPointer<CellMap>::New();
-  this->Cells->SetCapacity(nCells);
+  this->Cells->SetSize(nCells);
 
   try
   {
@@ -934,7 +940,7 @@ void vtkPolyData::BuildCells()
 
     if (nLines > 0)
     {
-      lines->Visit(BuildCellsImpl{}, this->Cells, [](vtkIdType size) -> VTKCellType {
+      lines->Visit(BuildCellsImpl{nVerts}, this->Cells, [](vtkIdType size) -> VTKCellType {
         if (size < 2)
         {
           throw std::runtime_error("Invalid cell size for lines.");
@@ -945,7 +951,7 @@ void vtkPolyData::BuildCells()
 
     if (nPolys > 0)
     {
-      polys->Visit(BuildCellsImpl{}, this->Cells, [](vtkIdType size) -> VTKCellType {
+      polys->Visit(BuildCellsImpl{nVerts + nLines}, this->Cells, [](vtkIdType size) -> VTKCellType {
         if (size < 3)
         {
           throw std::runtime_error("Invalid cell size for polys.");
@@ -965,7 +971,7 @@ void vtkPolyData::BuildCells()
 
     if (nStrips > 0)
     {
-      strips->Visit(BuildCellsImpl{}, this->Cells, [](vtkIdType size) -> VTKCellType {
+      strips->Visit(BuildCellsImpl{nVerts + nLines + nPolys}, this->Cells, [](vtkIdType size) -> VTKCellType {
         if (size < 3)
         {
           throw std::runtime_error("Invalid cell size for polys.");

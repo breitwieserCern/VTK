@@ -56,8 +56,11 @@ struct AppendTrianglesWorker
 
     auto numCells = cells->GetNumberOfCells();
     //TODO does this apply for all use cases? cellSize constant 3?!?
-    indexArray->resize(3 * numCells);
-
+    indexArray->reserve(3 * numCells);
+    // FIXME hack: overwrite size of indexArray
+    // vector data layout: {data_start, data_end, data_finish}
+    *(reinterpret_cast<uint64_t*>(indexArray) + 1) = *(reinterpret_cast<uint64_t*>(indexArray)) + sizeof(unsigned int) * 3 * numCells;
+    
 #pragma omp parallel for
     for (vtkIdType j = 0; j < numCells; ++j)
     {

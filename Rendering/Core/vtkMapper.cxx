@@ -799,17 +799,18 @@ void CreateColorTextureCoordinates(T* input, float* output, vtkIdType numScalars
   else
   {
     input += component;
+#pragma omp parallel for
     for (vtkIdType scalarIdx = 0; scalarIdx < numScalars; ++scalarIdx)
     {
-      double input_value = static_cast<double>(*input);
+      double input_value = static_cast<double>(*(input + scalarIdx * numComps));
       if (use_log_scale)
       {
         input_value = vtkLookupTable::ApplyLogScale(input_value, table_range, range);
       }
       ScalarToTextureCoordinate(
-        input_value, padded_range[0], inv_range_width, output[0], output[1]);
-      output += 2;
-      input = input + numComps;
+        input_value, padded_range[0], inv_range_width, output[2 * scalarIdx], output[2 * scalarIdx + 1]);
+      // output += 2;
+      // input = input + numComps;
     }
   }
 }

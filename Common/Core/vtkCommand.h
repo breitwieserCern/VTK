@@ -379,6 +379,12 @@ class VTKCOMMONCORE_EXPORT vtkCommand : public vtkObjectBase
 public:
   vtkBaseTypeMacro(vtkCommand, vtkObjectBase);
 
+  // FIXME hack; this is in the wrong file
+  // just needed a quick way to include it from ParaView and VTK
+  // see vtkOpenGlBufferObject
+  static int kOpenGLCacheIndex; 
+  
+
   /**
    * Decrease the reference count (release by another object). This has
    * the same effect as invoking Delete() (i.e., it reduces the reference

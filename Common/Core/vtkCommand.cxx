@@ -20,6 +20,9 @@
 static const char* leakname = "vtkCommand or subclass";
 #endif
 
+int vtkCommand::kOpenGLCacheIndex = 0;
+
+
 //----------------------------------------------------------------
 vtkCommand::vtkCommand()
   : AbortFlag(0)

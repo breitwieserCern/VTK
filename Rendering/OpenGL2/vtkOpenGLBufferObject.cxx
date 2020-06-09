@@ -13,9 +13,11 @@
 =========================================================================*/
 #include "vtkOpenGLBufferObject.h"
 #include "vtkObjectFactory.h"
+#include "vtkCommand.h"
 
 #include "vtk_glew.h"
 #include <chrono>
+#include <unistd.h> // FIXME remove
 
 vtkStandardNewMacro(vtkOpenGLBufferObject);
 
@@ -46,10 +48,31 @@ struct vtkOpenGLBufferObject::Private
     this->Handle = 0;
     this->Type = GL_ARRAY_BUFFER;
   }
+
+  Private(const Private& other) : Type(other.Type), Handle(other.Handle), 
+    Buffer(other.Buffer), Capacity(other.Capacity), 
+    Sync(other.Sync) {}
+
+  Private& operator=(const Private& other) {
+    if(&other == this) {
+      return *this;
+    }
+    Type = other.Type;
+    Handle = other.Handle;
+    Buffer = other.Buffer;
+    Capacity = other.Capacity;
+    Sync = other.Sync;
+    return *this;
+  }
+
   GLenum Type;
   GLuint Handle;
   void* Buffer = nullptr;
+  size_t Capacity = 0;  
+  GLsync Sync = 0;
 };
+
+std::vector<vtkOpenGLBufferObject::Private*> vtkOpenGLBufferObject::kCachedOGLData;
 
 vtkOpenGLBufferObject::vtkOpenGLBufferObject()
 {
@@ -62,7 +85,7 @@ vtkOpenGLBufferObject::~vtkOpenGLBufferObject()
 {
   if (this->Internal->Handle != 0)
   {
-    glDeleteBuffers(1, &this->Internal->Handle);
+    // glDeleteBuffers(1, &this->Internal->Handle);
   }
   delete this->Internal;
 }
@@ -117,12 +140,13 @@ bool vtkOpenGLBufferObject::Bind()
 
 bool vtkOpenGLBufferObject::Release()
 {
+  std::cout << "ReleaseBuffer" << std::endl;
   if (!this->Internal->Handle)
   {
     return false;
   }
 
-  glBindBuffer(this->Internal->Type, 0);
+  // glBindBuffer(this->Internal->Type, 0);
   return true;
 }
 
@@ -185,11 +209,42 @@ char const* gl_error_string(GLenum const err) noexcept
   }
 }
 
+void LockBuffer(GLsync& syncObj)
+{
+  if (syncObj) {
+    glDeleteSync(syncObj);
+    syncObj = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  }
+}
+
+void WaitBuffer(GLsync& syncObj)
+{
+  if (syncObj)
+  {
+    while (1)
+    {
+      GLenum waitReturn = glClientWaitSync(syncObj, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
+      if (waitReturn == GL_ALREADY_SIGNALED || waitReturn == GL_CONDITION_SATISFIED)
+      {
+        return;
+      }
+    }
+  }
+}
+
 bool vtkOpenGLBufferObject::UploadInternal(
   const void* buffer, size_t size, vtkOpenGLBufferObject::ObjectType objectType)
 {
-	auto start = Timestamp();
   auto old_handle = this->Internal->Handle;
+  auto cache_idx = ++vtkCommand::kOpenGLCacheIndex;
+  // restore
+  if (old_handle == 0 && cache_idx < kCachedOGLData.size()) {
+    *this->Internal = *kCachedOGLData[cache_idx-1];
+    if (size <= this->Internal->Capacity) {
+      old_handle = this->Internal->Handle;
+    }
+    // FIXME deallocate current ogl resources 
+  }
   const bool generated = this->GenerateBuffer(objectType);
   if (!generated)
   {
@@ -197,46 +252,37 @@ bool vtkOpenGLBufferObject::UploadInternal(
     return false;
   }
 
-  std::cout << "vtkOpenGLBufferObject::UploadInternal size " << size << " type " << this->Internal->Type << " handle " << this->Internal->Handle << std::endl;
-  glBindBuffer(this->Internal->Type, this->Internal->Handle);
-  // glBufferData(this->Internal->Type, size, static_cast<const GLvoid*>(buffer), GL_STATIC_DRAW);
-
   if (old_handle == 0) {
+    std::cout << "old handle was 0" << std::endl;
     glBindBuffer(this->Internal->Type, this->Internal->Handle);
     glBufferStorage(this->Internal->Type, size,  0, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
     this->Internal->Buffer = glMapBufferRange(this->Internal->Type, 0, size, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+    if (!this->Internal->Buffer) {
+      std::cout << "ERROR in glMapBufferRange" << std::endl;
+      GLenum err;
+      while((err = glGetError()) != GL_NO_ERROR)
+      {
+        std::cout << "GL ERROR " << err << std::endl;
+        std::cout << "  " << gl_error_string(err) << std::endl;
+        std::cout << "gl buffer size " << gl_error_string(err) << std::endl;
+      }
+    }
+    this->Internal->Capacity = size;
   }
   const auto* charptr = (const uint64_t*) buffer;
-  // glBufferData(this->Internal->Type, size, 0, GL_STATIC_DRAW);
-  // auto* p = glMapBufferRange(this->Internal->Type, 0,size, GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
   auto* ptr = static_cast<uint64_t*>(this->Internal->Buffer);
-  if (!ptr) {
-    std::cout << "ERROR in glMapBufferRange" << std::endl;
-    GLenum err;
-    while((err = glGetError()) != GL_NO_ERROR)
-    {
-      std::cout << "GL ERROR " << err << std::endl;
-      std::cout << "  " << gl_error_string(err) << std::endl;
-      std::cout << "gl buffer size " << gl_error_string(err) << std::endl;
-    }
-  }
 
-  // if (size > 349620) {
+  WaitBuffer(this->Internal->Sync);
 #pragma omp parallel for 
     for (int i = 0; i < size / sizeof(uint64_t); ++i) {
       ptr[i] = charptr[i];
     }
-  // } else {
-  //   for (int i = 0; i < size; ++i) {
-  //     ptr[i] = charptr[i];
-  //   }
-    
-  // }
-  // glUnmapBuffer(this->Internal->Type);
+  LockBuffer(this->Internal->Sync);
 
-  auto duration = Timestamp() - start;
-	double rate = static_cast<double>(size) / (1024 * 1024 * 1024) / duration * 1000.0;
-	std::cout << "  transfer time " << duration << " rate: " << rate << "GB/s" << std::endl;
+  // backup 
+  if (old_handle == 0 && cache_idx >= kCachedOGLData.size()) {
+    kCachedOGLData.push_back(new Private(*this->Internal));
+  }
   this->Dirty = false;
   return true;
 }

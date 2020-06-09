@@ -37,6 +37,9 @@ public:
   vtkTypeMacro(vtkOpenGLBufferObject, vtkObject);
   void PrintSelf(ostream& os, vtkIndent indent) override;
 
+  struct Private;
+  static std::vector<Private*> kCachedOGLData;
+
   enum ObjectType
   {
     ArrayBuffer,
@@ -107,7 +110,6 @@ protected:
 private:
   vtkOpenGLBufferObject(const vtkOpenGLBufferObject&) = delete;
   void operator=(const vtkOpenGLBufferObject&) = delete;
-  struct Private;
   Private* Internal;
 };
 
